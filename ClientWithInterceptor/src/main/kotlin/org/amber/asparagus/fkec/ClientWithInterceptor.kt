@@ -1,4 +1,4 @@
-package org.amber.asparagus.iolite
+package org.amber.asparagus.fkec
 
 class ClientWithInterceptor {
     companion object {
