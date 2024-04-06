@@ -33,6 +33,7 @@ class PostHandshakeController {
         @RequestBody
         body: TransactionRequest
     ) : ResponseEntity<TransactionResponse> {
+        println("================================Controller======================================")
         println("Header1 : $header1")
         println("Header2 : $header2")
         println("param1  : $param1")
@@ -47,6 +48,7 @@ class PostHandshakeController {
         val respHeader = HttpHeaders()
         respHeader.add("X-repshdr1", "Resp Hdr1")
         respHeader.add("X-repshdr2", "Resp Hdr2")
+        println("================================End Controller======================================")
 
         return ResponseEntity(response, respHeader, HttpStatus.OK)
     }
