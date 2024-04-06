@@ -42,6 +42,8 @@ class KyberFilter : Filter {
             return
         }
 
+        // TODO : Do checks to support only json body.
+
         println("Http method : ${httpRequest.method}")
 
         println("Parameters : ")
