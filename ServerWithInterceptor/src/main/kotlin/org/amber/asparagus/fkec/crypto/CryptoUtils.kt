@@ -14,7 +14,7 @@ import javax.crypto.KeyGenerator
 import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.SecretKeySpec
 
-class Utils {
+class CryptoUtils {
     companion object {
         fun registerBouncyCastleProvider() {
             if(Security.getProvider("BCPQC") == null){

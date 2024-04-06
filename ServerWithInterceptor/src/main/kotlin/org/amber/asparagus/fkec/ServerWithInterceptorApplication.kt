@@ -1,6 +1,6 @@
 package org.amber.asparagus.fkec
 
-import org.amber.asparagus.fkec.crypto.Utils
+import org.amber.asparagus.fkec.crypto.CryptoUtils
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.runApplication
 
@@ -8,6 +8,6 @@ import org.springframework.boot.runApplication
 class ServerWithInterceptorApplication
 
 fun main(args: Array<String>) {
-	Utils.registerBouncyCastleProvider()
+	CryptoUtils.registerBouncyCastleProvider()
 	runApplication<ServerWithInterceptorApplication>(*args)
 }

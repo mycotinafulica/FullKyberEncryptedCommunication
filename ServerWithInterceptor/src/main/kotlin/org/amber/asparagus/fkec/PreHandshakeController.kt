@@ -1,7 +1,7 @@
 package org.amber.asparagus.fkec
 
 import org.amber.asparagus.fkec.crypto.SessionDb
-import org.amber.asparagus.fkec.crypto.Utils
+import org.amber.asparagus.fkec.crypto.CryptoUtils
 import org.amber.asparagus.fkec.dto.HandshakeInput
 import org.amber.asparagus.fkec.dto.HandshakeOutput
 import org.springframework.beans.factory.annotation.Autowired
@@ -28,7 +28,7 @@ class PreHandshakeController {
         // Please use proper logging framework for production
         println("Encapsulated key : $encapsulatedKey")
 
-        val sessionKey      = Utils.decapsulateKey(privateKey, encapsulatedKey)
+        val sessionKey      = CryptoUtils.decapsulateKey(privateKey, encapsulatedKey)
         val sessionId       = UUID.randomUUID().toString()
 
         println("Session ID  : $sessionId")
@@ -36,7 +36,7 @@ class PreHandshakeController {
 
         SessionDb.sessions.put(sessionId, sessionKey)
 
-        val response = HandshakeOutput("00", Utils.aesGcmEncrypt(sessionId, sessionKey))
+        val response = HandshakeOutput("00", CryptoUtils.aesGcmEncrypt(sessionId, sessionKey))
 
         return ResponseEntity<HandshakeOutput>(response, HttpStatus.OK)
     }
