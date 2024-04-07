@@ -16,18 +16,46 @@ import java.io.InputStreamReader
 * The body itself, the query parameters and the custom headers (headers with x-*)
 *
 * The layout of the payload of encryption will be as the following :
-* ~~~BODY~~~<body>~~~PARAMS~~~<param1:param_value>,<param2:param_value>~~~HEADERS~~~<header1:header_value>
+* ~~~BODY~~~<body>~~~PARAMS~~~<original_param_value>~~~HEADERS~~~<header1:header_value>||<header2:header_value>
 *
 * The encrypted data will be put raw on the body, decrypted & reconstructed on the spring-boot filter before going
 * into the controller service.
 *
 * For get request, since it is not recommended to put body there, then the encrypted data will be put as query params
 * with the following layout :
-* ~~~PARAMS~~~<param1:param_value>,<param2:param_value>~~~HEADERS~~~<header1:header_value>
+* ~~~PARAMS~~~<original_param_value>~~~HEADERS~~~<header1:header_value>
 *
 * and will be put as the query parameter :
 * https://domain/endpoint?data=encrypted_data
 *
+* The session info will always be sent as a header in x-session-info, this one will not be encrypted (as it already
+* encrypted when returned from the server anyway.
+*
+* Since the body will be formatted into a raw encrypted data, there will also be one additional header
+* which is x-orig-content-type, which will store the original content type value (only for POST method)
+*
+* */
+
+/*
+* Temp comment
+* Http method : POST
+Url : http://localhost:8080/fkec/post-handshake/transaction
+Query : param1=pararam&param2=2500
+Parameters :
+param1 : [pararam]
+param2 : [2500]
+Headers :
+x-header1 : MyHeader1
+x-header2 : MyHeader2
+x-session-info : PpTOp1OR5//B6bdT8m9O986v73enDXdWXW9prEEg2JAdLjmIRYw8SeoTT9P4iS8xFgxK/Zidozr26RQ9gN4plg==
+content-type : application/json; charset=utf-8
+content-length : 45
+host : localhost:8080
+connection : Keep-Alive
+accept-encoding : gzip
+user-agent : okhttp/4.12.0
+Body :
+{"field1":"myField","field2":0,"field3":true}
 * */
 
 class KyberFilter : Filter {
@@ -45,6 +73,8 @@ class KyberFilter : Filter {
         // TODO : Do checks to support only json body.
 
         println("Http method : ${httpRequest.method}")
+        println("Url : ${httpRequest.requestURL}")
+        println("Query : ${httpRequest.queryString}")
 
         println("Parameters : ")
         httpRequest.parameterMap.forEach { (k, v) ->
@@ -56,6 +86,7 @@ class KyberFilter : Filter {
             val headerVal = httpRequest.getHeader(it)
             println("$it : $headerVal")
         }
+
 
         if(httpRequest.method == "POST") {
             println("Body : ")
