@@ -36,7 +36,7 @@ class PreHandshakeController {
 
         SessionDb.sessions.put(sessionId, sessionKey)
 
-        val response = HandshakeOutput("00", CryptoUtils.aesGcmEncrypt(sessionId, sessionKey))
+        val response = HandshakeOutput("00", sessionId)
 
         return ResponseEntity<HandshakeOutput>(response, HttpStatus.OK)
     }

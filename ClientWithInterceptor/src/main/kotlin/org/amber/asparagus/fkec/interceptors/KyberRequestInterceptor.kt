@@ -7,7 +7,7 @@ import okio.Buffer
 import org.amber.asparagus.fkec.ApplicationState
 import org.amber.asparagus.fkec.crypto.Utils
 
-class RequestInterceptor : Interceptor {
+class KyberRequestInterceptor : Interceptor {
     companion object {
         private const val METHOD_GET  = "GET"
         private const val METHOD_POST = "POST"
@@ -17,10 +17,12 @@ class RequestInterceptor : Interceptor {
 
         val request = chain.request()
 
+        // if handshake hasn't been done, then skip
         if(request.url.toString().contains("pre-handshake")){
             return chain.proceed(request)
         }
 
+        // only support GET & POST method as of now
         if(request.method != METHOD_GET
             && request.method != METHOD_POST) {
             return chain.proceed(request)
@@ -44,7 +46,7 @@ class RequestInterceptor : Interceptor {
         if(request.method == METHOD_GET) {
             reconstructQueryParamsForGetRequest(request, requestBuilder, encryptedPayload)
         }
-        else if(request.method == METHOD_POST) {
+        else { // if POST
             reconstructBody(request, requestBuilder, encryptedPayload)
         }
 

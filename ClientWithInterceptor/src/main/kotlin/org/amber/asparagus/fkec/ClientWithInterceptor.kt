@@ -10,7 +10,7 @@ import org.amber.asparagus.fkec.crypto.Utils
 import org.amber.asparagus.fkec.dto.HandshakeInput
 import org.amber.asparagus.fkec.dto.HandshakeOutput
 import org.amber.asparagus.fkec.dto.TransactionRequest
-import org.amber.asparagus.fkec.interceptors.RequestInterceptor
+import org.amber.asparagus.fkec.interceptors.KyberRequestInterceptor
 import java.util.*
 
 class ClientWithInterceptor {
@@ -91,7 +91,7 @@ class ClientWithInterceptor {
             }
 
             return OkHttpClient.Builder()
-                .addInterceptor(RequestInterceptor())
+                .addInterceptor(KyberRequestInterceptor())
                 .addInterceptor(loggingInterceptor)
                 .build()
         }
