@@ -10,7 +10,9 @@ import org.amber.asparagus.fkec.crypto.Utils
 import org.amber.asparagus.fkec.dto.HandshakeInput
 import org.amber.asparagus.fkec.dto.HandshakeOutput
 import org.amber.asparagus.fkec.dto.TransactionRequest
+import org.amber.asparagus.fkec.dto.TransactionResponse
 import org.amber.asparagus.fkec.interceptors.KyberRequestInterceptor
+import org.amber.asparagus.fkec.interceptors.KyberResponseInterceptor
 import java.util.*
 
 class ClientWithInterceptor {
@@ -32,7 +34,11 @@ class ClientWithInterceptor {
 //            println("Session info : ${ApplicationState.sessionInfo}")
 
             val basicRequest = createBasicTransactionRequest()
-            client.newCall(basicRequest).execute()
+            val response = client.newCall(basicRequest).execute()
+
+            val respObj = gson.fromJson(response.body?.string(), TransactionResponse::class.java)
+
+            println(respObj)
         }
 
         private fun createHandshakeRequest(secret: String): Request {
@@ -93,6 +99,7 @@ class ClientWithInterceptor {
             return OkHttpClient.Builder()
                 .addInterceptor(KyberRequestInterceptor())
                 .addInterceptor(loggingInterceptor)
+                .addInterceptor(KyberResponseInterceptor())
                 .build()
         }
     }
