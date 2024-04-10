@@ -4,15 +4,16 @@ import jakarta.servlet.*
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletRequestWrapper
 import jakarta.servlet.http.HttpServletResponse
+import jakarta.servlet.http.HttpServletResponseWrapper
 import org.amber.asparagus.fkec.crypto.CryptoUtils
 import org.amber.asparagus.fkec.crypto.SessionDb
-import java.io.BufferedReader
-import java.io.ByteArrayInputStream
-import java.io.InputStreamReader
 import org.amber.asparagus.fkec.filter.KyberFilterConstant.Companion.METHOD_GET
 import org.amber.asparagus.fkec.filter.KyberFilterConstant.Companion.METHOD_POST
 import org.amber.asparagus.fkec.filter.KyberFilterConstant.Companion.ORIG_CONTENT_TYPE_HEADER
 import org.amber.asparagus.fkec.filter.KyberFilterConstant.Companion.SESSION_INFO_HEADER
+import org.amber.asparagus.fkec.util.BaosWrapper
+import org.springframework.http.MediaType
+import java.io.*
 import java.util.*
 import kotlin.collections.HashMap
 
@@ -43,6 +44,8 @@ import kotlin.collections.HashMap
 * Since the body will be formatted into a raw encrypted data, there will also be one additional header
 * which is x-orig-content-type, which will store the original content type value (only for POST method)
 *
+* For response, though, since parameter is of not importance, the format will only be
+* ~~~BODY~~~<body>~~~HEADERS~~~<header1:header_value>||<header2:header_value>
 * */
 
 /*
@@ -67,12 +70,9 @@ Body :
 {"field1":"myField","field2":0,"field3":true}
 * */
 
-
+// TODO : Question -> what will happen if the request / response body is so so so so so so large
 // This filter will be in effect for /post-handshake/* endpoints
 class KyberFilter : Filter {
-    companion object {
-
-    }
     override fun doFilter(request: ServletRequest, response: ServletResponse
                           , chain: FilterChain) {
 
@@ -85,52 +85,130 @@ class KyberFilter : Filter {
             return
         }
 
-        // TODO : Do checks to support only json body.
-
         val wrappedRequest = RequestWrapper(httpRequest)
-        chain.doFilter(wrappedRequest, response)
+        val capturingResp  = ResponseWrapper(response as HttpServletResponse)
 
-//        println("Http method : ${httpRequest.method}")
-//        println("Url : ${httpRequest.requestURL}")
-//        println("Query : ${httpRequest.queryString}")
-//
-//        println("Parameters : ")
-//        httpRequest.parameterMap.forEach { (k, v) ->
-//            println("$k : ${v.contentToString()}")
-//        }
-//
-//        println("Headers : ")
-//        httpRequest.headerNames.asIterator().forEach {
-//            val headerVal = httpRequest.getHeader(it)
-//            println("$it : $headerVal")
-//        }
-//
-//
-//        if(httpRequest.method == "POST") {
-//            println("Body : ")
-//            val requestWrapper = RequestWrapper(httpRequest)
-//            val body = requestWrapper.inputStream.bufferedReader().use { it.readText() }
-//            println(body)
-//
-//            chain.doFilter(requestWrapper, response)
-//        }
-//        else {
-//            chain.doFilter(httpRequest, response)
-//        }
+        chain.doFilter(wrappedRequest, capturingResp)
 
-        println("Responses : ")
-        val httpResponse = response as HttpServletResponse
-        println("Headers : ")
-        httpResponse.headerNames.forEach {
-            val headerVal = httpResponse.getHeader(it)
-            println("$it : $headerVal")
+//        println("Filter chain done, now on response part, is commited : ${response.isCommitted}}")
+
+        val respBody            = capturingResp.getCapturedBody()
+        val modifiedBodyBuilder = StringBuilder()
+
+        modifiedBodyBuilder.append("~~~BODY~~~$respBody~~~HEADERS~~~")
+        var headersToEnc = ""
+        capturingResp.filteredHeader.forEach {
+            it.value.forEach { value ->
+                headersToEnc += "${it.key}:$value||"
+            }
         }
+
+        if(headersToEnc.endsWith("||")) {
+            modifiedBodyBuilder.append(headersToEnc.substring(0, headersToEnc.length - 2))
+        }
+        else {
+            modifiedBodyBuilder.append(headersToEnc)
+        }
+
+        val sessionId = httpRequest.getHeader(SESSION_INFO_HEADER)
+        val encryptedModifiedResp = CryptoUtils.aesGcmEncrypt(modifiedBodyBuilder.toString()
+            , SessionDb.sessions[sessionId]!!)
+
+        response.setContentLength(encryptedModifiedResp.length)
+        response.contentType = MediaType.TEXT_PLAIN_VALUE
+//        println("Writing to response")
+        response.writer.write(encryptedModifiedResp)
+
+        // TODO : After the response & headers are captured, we need to do the following :
+        // TODO : 1. Modify the response & add the headers and encrypt them
+        // TODO : 2. Write the modified response to the actual response
+        // Notable observation : it seems the buffer will not be committed until all filters are executed.
+        // Still need to test  : A large response body that exceed 8192 bytes, how it will be handled? It seems that
+        // chunked encoding will apply, but how will it affect the servlet filter?
+        // It might be the case that after encrypted the new length will exceed the buffer size for the chunk
+        // In which case, we need to set the buffer size of the response (since we intercept the response by capturing it,
+        // there's shouldn't be any bytes written to it yet, and thus the buffer size can still be modified.
 
         println("===========================FILTER END===========================")
     }
 }
 
-class RequestWrapper(private val request: HttpServletRequest)
+private class ResponseWrapper(response: HttpServletResponse)
+    : HttpServletResponseWrapper(response) {
+
+    private var baosWrapper = BaosWrapper(ByteArrayOutputStream(response.bufferSize))
+    val filteredHeader = HashMap<String, MutableList<String>>()
+    var getOutputStreamCalled = false
+        private set
+    var getWriterCalled = false
+        private set
+
+    fun getCapturedBody(): String {
+        /* TODO : We might need to consider Base64 to support binary output, or better yet, instead of operating on
+        *  TODO string level, it could be better to operate on byte array to reduce size. It can be future improvement.
+        */
+        return String(baosWrapper.toByteArray(), Charsets.UTF_8)
+    }
+
+    // We will intercept writing here so the writing will not go to the response's output stream just yet
+    override fun getOutputStream(): ServletOutputStream {
+        if(getWriterCalled) throw IllegalStateException("getWriter already called prior calling getOutputStream")
+
+        getOutputStreamCalled = true
+        return baosWrapper.baosServlet
+    }
+
+    override fun getWriter(): PrintWriter {
+        if(getOutputStreamCalled) throw IllegalStateException("getOutputStream already called prior calling getWriter")
+
+        getWriterCalled = true
+
+        return baosWrapper.printWriter
+    }
+
+    override fun addHeader(name: String, value: String) {
+        // Filer x-* header for being written, as it should be encrypted
+        if(name.lowercase().startsWith("x-")
+            && name.lowercase() != "x-orig-content-type") {
+            if(filteredHeader.contains(name)) {
+                val currList = filteredHeader[name]!!
+                currList.add(value)
+                filteredHeader[name] = currList
+            }
+            else {
+                filteredHeader[name] = arrayListOf(value)
+            }
+            return
+        }
+        super.addHeader(name, value)
+    }
+
+    override fun addIntHeader(name: String, value: Int) {
+        addHeader(name, "" + value)
+    }
+
+    override fun setBufferSize(size: Int) {
+        super.setBufferSize(size)
+        baosWrapper.setBufferSize(size)
+    }
+
+    override fun resetBuffer() {
+        super.resetBuffer()
+        baosWrapper.reset()
+    }
+
+    override fun flushBuffer() {
+        // no-op, we don't want to commit the response yet
+//        println("Buffer is flushed")
+    }
+
+    override fun reset() {
+        super.reset()
+        baosWrapper.reset()
+    }
+}
+
+private class RequestWrapper(private val request: HttpServletRequest)
     : HttpServletRequestWrapper(request) {
 
     private var body: String        = ""
