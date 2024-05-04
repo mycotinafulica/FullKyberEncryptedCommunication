@@ -59,6 +59,7 @@ class KyberResponseInterceptor: Interceptor {
 
     private fun extractAndDecryptResponseBody(responseBody: ResponseBody): String {
         val encryptedBody = responseBody.string()
+        println("Received response body : $encryptedBody")
         return Utils.aesGcmDecrypt(encryptedBody, ApplicationState.sessionKey)
     }
 }
